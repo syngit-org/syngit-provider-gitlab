@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 
 	syngit "github.com/syngit-org/syngit/api/v1beta2"
@@ -31,6 +32,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -83,7 +85,7 @@ func (r *RemoteUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	remoteUserChecker.testConnection()
 
 	remoteUser.Status.Conditions = remoteUserChecker.remoteUser.Status.Conditions
-	_ = r.Status().Update(ctx, &remoteUser)
+	_ = r.updateStatus(ctx, req, remoteUserChecker.remoteUser.Status.Conditions, 2)
 
 	return ctrl.Result{}, nil
 }
@@ -96,7 +98,7 @@ func (ruc *RemoteUserChecker) testConnection() {
 	} else {
 		if len(ruc.secret.Data) != 0 {
 			client, err := gitlab.NewClient(string(ruc.secret.Data["password"]))
-			if err != nil {
+			if err == nil {
 				user, _, err := client.Users.CurrentUser()
 				if err != nil {
 					condition := metav1.Condition{
@@ -120,6 +122,22 @@ func (ruc *RemoteUserChecker) testConnection() {
 			}
 		}
 	}
+}
+
+func (r *RemoteUserReconciler) updateStatus(ctx context.Context, req ctrl.Request, conditions []metav1.Condition, retryNumber int) error {
+	var remoteUser syngit.RemoteUser
+	if err := r.Get(ctx, req.NamespacedName, &remoteUser); err != nil {
+		return err
+	}
+
+	remoteUser.Status.Conditions = conditions
+	if err := r.Status().Update(ctx, &remoteUser); err != nil {
+		if retryNumber > 0 {
+			return r.updateStatus(ctx, req, conditions, retryNumber-1)
+		}
+		return err
+	}
+	return nil
 }
 
 func typeBasedConditionUpdater(conditions []metav1.Condition, condition metav1.Condition) []metav1.Condition {
@@ -172,6 +190,37 @@ const (
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *RemoteUserReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &syngit.RemoteUser{}, secretRefField, func(rawObj client.Object) []string {
+		// Extract the Secret name from the RemoteUser Spec, if one is provided
+		remoteUser := rawObj.(*syngit.RemoteUser)
+		if remoteUser.Spec.SecretRef.Name == "" {
+			return nil
+		}
+		return []string{remoteUser.Spec.SecretRef.Name}
+	}); err != nil {
+		return err
+	}
+
+	p := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			oldObject, _ := e.ObjectOld.(*syngit.RemoteUser)
+			newObject, _ := e.ObjectNew.(*syngit.RemoteUser)
+
+			if newObject != nil {
+				if !maps.Equal(oldObject.DeepCopy().Labels, newObject.DeepCopy().Labels) {
+					return true
+				}
+				if !maps.Equal(oldObject.DeepCopy().Annotations, newObject.DeepCopy().Annotations) {
+					return true
+				}
+				if oldObject.DeepCopy().Spec != newObject.Spec {
+					return true
+				}
+			}
+			return false
+		},
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&syngit.RemoteUser{}).
 		Named("remoteuser").
@@ -180,6 +229,6 @@ func (r *RemoteUserReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSecret),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
-		WithEventFilter(predicate.GenerationChangedPredicate{}).
+		WithEventFilter(p).
 		Complete(r)
 }
