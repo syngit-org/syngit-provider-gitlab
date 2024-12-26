@@ -20,9 +20,9 @@ import (
 	"context"
 	"fmt"
 	"maps"
-	"slices"
 
-	syngit "github.com/syngit-org/syngit/api/v1beta2"
+	syngit "github.com/syngit-org/syngit/pkg/api/v1beta2"
+	syngitutils "github.com/syngit-org/syngit/pkg/utils"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -94,7 +94,7 @@ func (ruc *RemoteUserChecker) testConnection() {
 	conditions := ruc.remoteUser.Status.DeepCopy().Conditions
 
 	if ruc.remoteUser.Annotations["gitlab.syngit.io/auth.test"] != "true" {
-		ruc.remoteUser.Status.Conditions = typeBasedConditionRemover(conditions, "Authenticated")
+		ruc.remoteUser.Status.Conditions = syngitutils.TypeBasedConditionRemover(conditions, "Authenticated")
 	} else {
 		if len(ruc.secret.Data) != 0 {
 			client, err := gitlab.NewClient(string(ruc.secret.Data["password"]))
@@ -110,7 +110,7 @@ func (ruc *RemoteUserChecker) testConnection() {
 					}
 					ruc.remoteUser.Status.ConnexionStatus.Status = ""
 					ruc.remoteUser.Status.ConnexionStatus.Details = err.Error()
-					ruc.remoteUser.Status.Conditions = typeBasedConditionUpdater(conditions, condition)
+					ruc.remoteUser.Status.Conditions = syngitutils.TypeBasedConditionUpdater(conditions, condition)
 				} else {
 					condition := metav1.Condition{
 						Type:               "Authenticated",
@@ -121,7 +121,7 @@ func (ruc *RemoteUserChecker) testConnection() {
 					}
 					ruc.remoteUser.Status.ConnexionStatus.Details = ""
 					ruc.remoteUser.Status.ConnexionStatus.Status = syngit.GitConnected
-					ruc.remoteUser.Status.Conditions = typeBasedConditionUpdater(conditions, condition)
+					ruc.remoteUser.Status.Conditions = syngitutils.TypeBasedConditionUpdater(conditions, condition)
 				}
 			}
 		}
@@ -143,27 +143,6 @@ func (r *RemoteUserReconciler) updateStatus(ctx context.Context, req ctrl.Reques
 		return err
 	}
 	return nil
-}
-
-func typeBasedConditionUpdater(conditions []metav1.Condition, condition metav1.Condition) []metav1.Condition {
-	conditions = typeBasedConditionRemover(conditions, condition.Type)
-	conditions = append(conditions, condition)
-
-	return conditions
-}
-
-func typeBasedConditionRemover(conditions []metav1.Condition, typeKind string) []metav1.Condition {
-	removeIndex := -1
-	for i, statusCondition := range conditions {
-		if typeKind == statusCondition.Type {
-			removeIndex = i
-		}
-	}
-	if removeIndex != -1 {
-		conditions = slices.Delete(conditions, removeIndex, removeIndex+1)
-	}
-
-	return conditions
 }
 
 func (r *RemoteUserReconciler) findObjectsForSecret(ctx context.Context, secret client.Object) []reconcile.Request {
