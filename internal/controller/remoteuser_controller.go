@@ -18,8 +18,13 @@ package controller
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"errors"
 	"fmt"
 	"maps"
+	"net/http"
+	"os"
 
 	syngit "github.com/syngit-org/syngit/pkg/api/v1beta2"
 	syngitutils "github.com/syngit-org/syngit/pkg/utils"
@@ -47,13 +52,18 @@ type RemoteUserReconciler struct {
 
 type RemoteUserChecker struct {
 	remoteUser syngit.RemoteUser
-	secret     corev1.Secret
 }
 
 // +kubebuilder:rbac:groups=syngit.io,resources=remoteusers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=syngit.io,resources=remoteusers/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=syngit.io,resources=remoteusers/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch
+
+const (
+	authAnnotation         = "gitlab.syngit.io/auth.test"
+	skipInsecureAnnotation = "gitlab.syngit.io/auth.insecure-skip-tls-verify"
+	caBundleRefAnnotation  = "gitlab.syngit.io/auth.ca-bundle-secret-ref-name"
+)
 
 func (r *RemoteUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
@@ -72,17 +82,7 @@ func (r *RemoteUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	)
 
 	remoteUserChecker := RemoteUserChecker{remoteUser: *remoteUser.DeepCopy()}
-
-	var secret corev1.Secret
-	namespacedNameSecret := types.NamespacedName{Namespace: req.Namespace, Name: remoteUser.Spec.SecretRef.Name}
-	if err := r.Get(ctx, namespacedNameSecret, &secret); err != nil {
-		fmt.Println(err)
-		remoteUserChecker.secret = corev1.Secret{}
-	} else {
-		remoteUserChecker.secret = secret
-	}
-
-	remoteUserChecker.testConnection()
+	r.testConnection(&remoteUserChecker)
 
 	remoteUser.Status.Conditions = remoteUserChecker.remoteUser.Status.Conditions
 	_ = r.updateStatus(ctx, req, remoteUserChecker.remoteUser.Status, 2)
@@ -90,39 +90,133 @@ func (r *RemoteUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{}, nil
 }
 
-func (ruc *RemoteUserChecker) testConnection() {
+// TODO: to remove when syngit v0.4.0 is out
+const CaSecretWrongTypeErrorMessage = "the CA bundle secret must be of type \"kubernetes.io/ts\""
+
+// TODO: to remove when syngit v0.4.0 is out
+func findGlobalCABundle(client client.Client, host string) ([]byte, error) {
+	return findCABundle(client, os.Getenv("MANAGER_NAMESPACE"), host)
+}
+
+// TODO: to remove when syngit v0.4.0 is out
+func findCABundle(client client.Client, namespace string, name string) ([]byte, error) {
+	if name == "" {
+		return nil, nil
+	}
+
+	ctx := context.Background()
+	globalNamespacedName := types.NamespacedName{Namespace: namespace, Name: name}
+	caBundleSecret := &corev1.Secret{}
+
+	err := client.Get(ctx, globalNamespacedName, caBundleSecret)
+
+	if err != nil {
+		return nil, err
+	}
+	if caBundleSecret.Type != "kubernetes.io/tls" {
+		return nil, errors.New(CaSecretWrongTypeErrorMessage)
+	}
+	return caBundleSecret.Data["tls.crt"], nil
+}
+
+func (r *RemoteUserReconciler) getCABundle(remoteUser syngit.RemoteUser) ([]byte, error) {
+	var caBundle []byte
+	if caBundleRefName := remoteUser.Annotations[caBundleRefAnnotation]; caBundleRefName != "" {
+		var caErr error
+		caBundleRu, caErr := findCABundle(r.Client, remoteUser.Namespace, caBundleRefName)
+		if caErr != nil {
+			return nil, caErr
+		}
+		if caBundleRu != nil {
+			caBundle = caBundleRu
+		}
+
+		return caBundle, nil
+	}
+	return findGlobalCABundle(r.Client, remoteUser.Spec.GitBaseDomainFQDN)
+}
+
+func (r RemoteUserReconciler) testConnection(ruc *RemoteUserChecker) {
 	conditions := ruc.remoteUser.Status.DeepCopy().Conditions
 
-	if ruc.remoteUser.Annotations["gitlab.syngit.io/auth.test"] != "true" {
+	if ruc.remoteUser.Annotations[authAnnotation] != "true" {
 		ruc.remoteUser.Status.Conditions = syngitutils.TypeBasedConditionRemover(conditions, "Authenticated")
 	} else {
-		if len(ruc.secret.Data) != 0 {
-			client, err := gitlab.NewClient(string(ruc.secret.Data["password"]))
+		errorCondition := metav1.Condition{
+			Type:               "Authenticated",
+			Status:             metav1.ConditionFalse,
+			Reason:             "AuthenticationFailed",
+			LastTransitionTime: metav1.Now(),
+		}
+
+		// Get connection credentials
+		var secret corev1.Secret
+		namespacedNameSecret := types.NamespacedName{Namespace: ruc.remoteUser.Namespace, Name: ruc.remoteUser.Spec.SecretRef.Name}
+		if err := r.Get(context.Background(), namespacedNameSecret, &secret); err != nil {
+			secret = corev1.Secret{}
+		}
+
+		tlsConfig := &tls.Config{}
+
+		// Get the CA bundle if exists
+		caBundle, caErr := r.getCABundle(ruc.remoteUser)
+		if caErr != nil {
+			errorCondition.Message = caErr.Error()
+			ruc.remoteUser.Status.ConnexionStatus.Status = ""
+			ruc.remoteUser.Status.ConnexionStatus.Details = caErr.Error()
+			ruc.remoteUser.Status.Conditions = syngitutils.TypeBasedConditionUpdater(conditions, errorCondition)
+			return
+		}
+
+		if caBundle != nil {
+			caCertPool := x509.NewCertPool()
+			if !caCertPool.AppendCertsFromPEM(caBundle) {
+				caCertPoolErrorMessage := "Failed to append CA bundle"
+				errorCondition.Message = caCertPoolErrorMessage
+				ruc.remoteUser.Status.ConnexionStatus.Status = ""
+				ruc.remoteUser.Status.ConnexionStatus.Details = caCertPoolErrorMessage
+				ruc.remoteUser.Status.Conditions = syngitutils.TypeBasedConditionUpdater(conditions, errorCondition)
+				return
+			}
+			tlsConfig.RootCAs = caCertPool
+		}
+
+		// Check if insecure skip tls verify
+		if ruc.remoteUser.Annotations[skipInsecureAnnotation] == "true" {
+			tlsConfig.InsecureSkipVerify = true
+		}
+
+		httpClient := &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: tlsConfig,
+			},
+		}
+
+		if len(secret.Data) != 0 {
+
+			gitlabClient, err := gitlab.NewClient(string(secret.Data["password"]),
+				gitlab.WithBaseURL(fmt.Sprintf("https://%s", ruc.remoteUser.Spec.GitBaseDomainFQDN)),
+				gitlab.WithHTTPClient(httpClient),
+			)
 			if err == nil {
-				user, _, err := client.Users.CurrentUser()
+				user, _, err := gitlabClient.Users.CurrentUser()
 				if err != nil {
-					condition := metav1.Condition{
-						Type:               "Authenticated",
-						Status:             metav1.ConditionFalse,
-						Reason:             "AuthenticationFailed",
-						Message:            err.Error(),
-						LastTransitionTime: metav1.Now(),
-					}
+					errorCondition.Message = err.Error()
 					ruc.remoteUser.Status.ConnexionStatus.Status = ""
 					ruc.remoteUser.Status.ConnexionStatus.Details = err.Error()
-					ruc.remoteUser.Status.Conditions = syngitutils.TypeBasedConditionUpdater(conditions, condition)
-				} else {
-					condition := metav1.Condition{
-						Type:               "Authenticated",
-						Status:             metav1.ConditionTrue,
-						Reason:             "AuthenticationSucceded",
-						Message:            fmt.Sprintf("Authentication was successful with the user %s", user.Username),
-						LastTransitionTime: metav1.Now(),
-					}
-					ruc.remoteUser.Status.ConnexionStatus.Details = ""
-					ruc.remoteUser.Status.ConnexionStatus.Status = syngit.GitConnected
-					ruc.remoteUser.Status.Conditions = syngitutils.TypeBasedConditionUpdater(conditions, condition)
+					ruc.remoteUser.Status.Conditions = syngitutils.TypeBasedConditionUpdater(conditions, errorCondition)
+					return
 				}
+				condition := metav1.Condition{
+					Type:               "Authenticated",
+					Status:             metav1.ConditionTrue,
+					Reason:             "AuthenticationSucceded",
+					Message:            fmt.Sprintf("Authentication was successful with the user %s", user.Username),
+					LastTransitionTime: metav1.Now(),
+				}
+				ruc.remoteUser.Status.ConnexionStatus.Details = ""
+				ruc.remoteUser.Status.ConnexionStatus.Status = syngit.GitConnected
+				ruc.remoteUser.Status.Conditions = syngitutils.TypeBasedConditionUpdater(conditions, condition)
 			}
 		}
 	}
