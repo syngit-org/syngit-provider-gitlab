@@ -20,11 +20,9 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"maps"
 	"net/http"
-	"os"
 
 	syngit "github.com/syngit-org/syngit/pkg/api/v1beta2"
 	syngitutils "github.com/syngit-org/syngit/pkg/utils"
@@ -90,40 +88,11 @@ func (r *RemoteUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{}, nil
 }
 
-// TODO: to remove when syngit v0.4.0 is out
-const CaSecretWrongTypeErrorMessage = "the CA bundle secret must be of type \"kubernetes.io/ts\""
-
-// TODO: to remove when syngit v0.4.0 is out
-func findGlobalCABundle(client client.Client, host string) ([]byte, error) {
-	return findCABundle(client, os.Getenv("MANAGER_NAMESPACE"), host)
-}
-
-// TODO: to remove when syngit v0.4.0 is out
-func findCABundle(client client.Client, namespace string, name string) ([]byte, error) {
-	if name == "" {
-		return nil, nil
-	}
-
-	ctx := context.Background()
-	globalNamespacedName := types.NamespacedName{Namespace: namespace, Name: name}
-	caBundleSecret := &corev1.Secret{}
-
-	err := client.Get(ctx, globalNamespacedName, caBundleSecret)
-
-	if err != nil {
-		return nil, err
-	}
-	if caBundleSecret.Type != "kubernetes.io/tls" {
-		return nil, errors.New(CaSecretWrongTypeErrorMessage)
-	}
-	return caBundleSecret.Data["tls.crt"], nil
-}
-
 func (r *RemoteUserReconciler) getCABundle(remoteUser syngit.RemoteUser) ([]byte, error) {
 	var caBundle []byte
 	if caBundleRefName := remoteUser.Annotations[caBundleRefAnnotation]; caBundleRefName != "" {
 		var caErr error
-		caBundleRu, caErr := findCABundle(r.Client, remoteUser.Namespace, caBundleRefName)
+		caBundleRu, caErr := syngitutils.FindCABundle(r.Client, remoteUser.Namespace, caBundleRefName)
 		if caErr != nil {
 			return nil, caErr
 		}
@@ -133,7 +102,7 @@ func (r *RemoteUserReconciler) getCABundle(remoteUser syngit.RemoteUser) ([]byte
 
 		return caBundle, nil
 	}
-	return findGlobalCABundle(r.Client, remoteUser.Spec.GitBaseDomainFQDN)
+	return syngitutils.FindGlobalCABundle(r.Client, remoteUser.Spec.GitBaseDomainFQDN)
 }
 
 func (r RemoteUserReconciler) testConnection(ruc *RemoteUserChecker) {
