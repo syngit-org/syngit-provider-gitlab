@@ -129,13 +129,6 @@ func (r RemoteUserReconciler) testConnection(ruc *RemoteUserChecker) {
 
 		// Get the CA bundle if exists
 		caBundle, caErr := r.getCABundle(ruc.remoteUser)
-		if caErr != nil {
-			errorCondition.Message = caErr.Error()
-			ruc.remoteUser.Status.ConnexionStatus.Status = ""
-			ruc.remoteUser.Status.ConnexionStatus.Details = caErr.Error()
-			ruc.remoteUser.Status.Conditions = syngitutils.TypeBasedConditionUpdater(conditions, errorCondition)
-			return
-		}
 
 		if caBundle != nil {
 			caCertPool := x509.NewCertPool()
@@ -163,30 +156,44 @@ func (r RemoteUserReconciler) testConnection(ruc *RemoteUserChecker) {
 
 		if len(secret.Data) != 0 {
 
-			gitlabClient, err := gitlab.NewClient(string(secret.Data["password"]),
+			gitlabClient, gitlabClientErr := gitlab.NewClient(string(secret.Data["password"]),
 				gitlab.WithBaseURL(fmt.Sprintf("https://%s", ruc.remoteUser.Spec.GitBaseDomainFQDN)),
 				gitlab.WithHTTPClient(httpClient),
 			)
-			if err == nil {
-				user, _, err := gitlabClient.Users.CurrentUser()
-				if err != nil {
-					errorCondition.Message = err.Error()
+			if gitlabClientErr != nil {
+				if caErr != nil {
+					errorCondition.Message = caErr.Error()
 					ruc.remoteUser.Status.ConnexionStatus.Status = ""
-					ruc.remoteUser.Status.ConnexionStatus.Details = err.Error()
+					ruc.remoteUser.Status.ConnexionStatus.Details = caErr.Error()
+					ruc.remoteUser.Status.Conditions = syngitutils.TypeBasedConditionUpdater(conditions, errorCondition)
+					return
+				} else {
+					errorCondition.Message = gitlabClientErr.Error()
+					ruc.remoteUser.Status.ConnexionStatus.Status = ""
+					ruc.remoteUser.Status.ConnexionStatus.Details = gitlabClientErr.Error()
 					ruc.remoteUser.Status.Conditions = syngitutils.TypeBasedConditionUpdater(conditions, errorCondition)
 					return
 				}
-				condition := metav1.Condition{
-					Type:               "Authenticated",
-					Status:             metav1.ConditionTrue,
-					Reason:             "AuthenticationSucceded",
-					Message:            fmt.Sprintf("Authentication was successful with the user %s", user.Username),
-					LastTransitionTime: metav1.Now(),
-				}
-				ruc.remoteUser.Status.ConnexionStatus.Details = ""
-				ruc.remoteUser.Status.ConnexionStatus.Status = syngit.GitConnected
-				ruc.remoteUser.Status.Conditions = syngitutils.TypeBasedConditionUpdater(conditions, condition)
 			}
+
+			user, _, userErr := gitlabClient.Users.CurrentUser()
+			if userErr != nil {
+				errorCondition.Message = userErr.Error()
+				ruc.remoteUser.Status.ConnexionStatus.Status = ""
+				ruc.remoteUser.Status.ConnexionStatus.Details = userErr.Error()
+				ruc.remoteUser.Status.Conditions = syngitutils.TypeBasedConditionUpdater(conditions, errorCondition)
+				return
+			}
+			condition := metav1.Condition{
+				Type:               "Authenticated",
+				Status:             metav1.ConditionTrue,
+				Reason:             "AuthenticationSucceded",
+				Message:            fmt.Sprintf("Authentication was successful with the user %s", user.Username),
+				LastTransitionTime: metav1.Now(),
+			}
+			ruc.remoteUser.Status.ConnexionStatus.Details = ""
+			ruc.remoteUser.Status.ConnexionStatus.Status = syngit.GitConnected
+			ruc.remoteUser.Status.Conditions = syngitutils.TypeBasedConditionUpdater(conditions, condition)
 		}
 	}
 }
