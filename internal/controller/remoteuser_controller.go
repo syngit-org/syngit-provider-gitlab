@@ -102,7 +102,7 @@ func (r *RemoteUserReconciler) getCABundle(remoteUser syngit.RemoteUser) ([]byte
 
 		return caBundle, nil
 	}
-	return syngitutils.FindGlobalCABundle(r.Client, remoteUser.Spec.GitBaseDomainFQDN)
+	return syngitutils.FindGlobalCABundle(r.Client, remoteUser.Spec.GitBaseDomainFQDN+"ca-cert")
 }
 
 func (r RemoteUserReconciler) testConnection(ruc *RemoteUserChecker) {
