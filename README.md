@@ -10,4 +10,4 @@ An addon to use Gitlab functionalities into Syngit.
 
 ## Wiki
 
-More information can be found in the [📚 Wiki](https://gitlab.com/syngit-org/syngit-provider-gitlab/wiki)
+More information can be found in the [📚 Wiki](https://github.com/syngit-org/syngit-provider-gitlab/wiki)
