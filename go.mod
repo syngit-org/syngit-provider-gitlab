@@ -7,9 +7,9 @@ require (
 	github.com/onsi/gomega v1.34.1
 	github.com/syngit-org/syngit v0.3.5
 	gitlab.com/gitlab-org/api/client-go v0.118.0
-	k8s.io/api v0.31.0
-	k8s.io/apimachinery v0.31.0
-	k8s.io/client-go v0.31.0
+	k8s.io/api v0.34.1
+	k8s.io/apimachinery v0.34.1
+	k8s.io/client-go v0.34.1
 	sigs.k8s.io/controller-runtime v0.19.1
 )
 
