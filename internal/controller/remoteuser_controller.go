@@ -24,7 +24,7 @@ import (
 	"maps"
 	"net/http"
 
-	syngit "github.com/syngit-org/syngit/pkg/api/v1beta2"
+	syngit "github.com/syngit-org/syngit/pkg/api/v1beta3"
 	syngitutils "github.com/syngit-org/syngit/pkg/utils"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 	corev1 "k8s.io/api/core/v1"
@@ -192,7 +192,7 @@ func (r RemoteUserReconciler) testConnection(ruc *RemoteUserChecker) {
 				LastTransitionTime: metav1.Now(),
 			}
 			ruc.remoteUser.Status.ConnexionStatus.Details = ""
-			ruc.remoteUser.Status.ConnexionStatus.Status = syngit.GitConnected
+			ruc.remoteUser.Status.ConnexionStatus.Status = syngit.GitAuthenticated
 			ruc.remoteUser.Status.Conditions = syngitutils.TypeBasedConditionUpdater(conditions, condition)
 		}
 	}
