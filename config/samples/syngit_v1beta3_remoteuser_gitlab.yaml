@@ -1,4 +1,4 @@
-apiVersion: syngit.io/v1beta2
+apiVersion: syngit.io/v1beta3
 kind: RemoteUser
 metadata:
   labels:
