@@ -176,6 +176,8 @@ gitlab.com/gitlab-org/api/client-go v1.5.0 h1:kEHoqgNywPXV+I0oORiaOqy4hnWuqbUyPn
 gitlab.com/gitlab-org/api/client-go v1.5.0/go.mod h1:RQfw64j1FE+KMZUAKsi1ZOOvwbWxHn9SkyZg+IAvjk4=
 gitlab.com/gitlab-org/api/client-go v1.8.0 h1:IOD56AS4WismCeOz0PS3vrZr8RCr2A3B+rVfZzZjwLQ=
 gitlab.com/gitlab-org/api/client-go v1.8.0/go.mod h1:RQfw64j1FE+KMZUAKsi1ZOOvwbWxHn9SkyZg+IAvjk4=
+gitlab.com/gitlab-org/api/client-go v1.8.1 h1:YQyAh2Gd+NzcbRWWgDIi/pX0wLlm7QEZWtc0FikQRs4=
+gitlab.com/gitlab-org/api/client-go v1.8.1/go.mod h1:tVIvZPcBPFPGYtLZOUIUafaZMmomCS0W81eACbn4Egw=
 go.opentelemetry.io/auto/sdk v1.1.0 h1:cH53jehLUN6UFLY71z+NDOiNJqDdPRaXzTel0sJySYA=
 go.opentelemetry.io/auto/sdk v1.1.0/go.mod h1:3wSPjt5PWp2RhlCcmmOial7AvC4DQqZb7a7wCow3W8A=
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.58.0 h1:yd02MEjBdJkG3uabWP9apV+OuWRIXGDuJEUJbOHmCFU=

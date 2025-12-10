@@ -6,7 +6,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.27.2
 	github.com/onsi/gomega v1.38.2
 	github.com/syngit-org/syngit v0.4.8
-	gitlab.com/gitlab-org/api/client-go v1.8.0
+	gitlab.com/gitlab-org/api/client-go v1.8.1
 	k8s.io/api v0.34.2
 	k8s.io/apimachinery v0.34.2
 	k8s.io/client-go v0.34.2
