@@ -24,7 +24,7 @@ import (
 	"maps"
 	"net/http"
 
-	syngit "github.com/syngit-org/syngit/pkg/api/v1beta3"
+	syngit "github.com/syngit-org/syngit/pkg/api/v1beta4"
 	syngitutils "github.com/syngit-org/syngit/pkg/utils"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 	corev1 "k8s.io/api/core/v1"

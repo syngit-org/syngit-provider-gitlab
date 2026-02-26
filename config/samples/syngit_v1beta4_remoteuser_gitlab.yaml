@@ -1,0 +1,21 @@
+apiVersion: syngit.io/v1beta4
+kind: RemoteUser
+metadata:
+  labels:
+    app.kubernetes.io/name: remoteuser
+    app.kubernetes.io/instance: remoteuser-sample
+    app.kubernetes.io/part-of: syngit
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: syngit
+  name: remoteuser-sample
+  annotations:
+    syngit.io/associated-remoteuserbinding: "true"
+    gitlab.syngit.io/auth.test: "true"
+    gitlab.syngit.io/auth.insecure-skip-tls-verify: "true"
+    gitlab.syngit.io/auth.ca-bundle-secret-ref-name: ""
+spec:
+  gitBaseDomainFQDN: gitlab.com
+  email: my@email.com
+  secretRef:
+    name: my-gitlab-personal-access-token-secret
+
