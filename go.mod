@@ -5,7 +5,7 @@ go 1.25.4
 require (
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
-	github.com/syngit-org/syngit v0.5.2
+	github.com/syngit-org/syngit v0.6.0
 	gitlab.com/gitlab-org/api/client-go v1.44.0
 	k8s.io/api v0.35.1
 	k8s.io/apimachinery v0.35.1
@@ -57,7 +57,7 @@ require (
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.17.0 // indirect
-	github.com/spf13/cobra v1.10.1 // indirect
+	github.com/spf13/cobra v1.10.2 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stoewer/go-strcase v1.3.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
