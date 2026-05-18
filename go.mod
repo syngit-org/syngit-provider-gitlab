@@ -4,7 +4,7 @@ go 1.25.4
 
 require (
 	github.com/onsi/ginkgo/v2 v2.28.1
-	github.com/onsi/gomega v1.39.1
+	github.com/onsi/gomega v1.41.0
 	github.com/syngit-org/syngit v0.5.2
 	gitlab.com/gitlab-org/api/client-go v1.46.0
 	k8s.io/api v0.35.4
