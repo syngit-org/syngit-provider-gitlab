@@ -3,7 +3,7 @@ module github.com/syngit-org/syngit-provider-gitlab
 go 1.25.4
 
 require (
-	github.com/onsi/ginkgo/v2 v2.30.0
+	github.com/onsi/ginkgo/v2 v2.32.1
 	github.com/onsi/gomega v1.42.1
 	github.com/syngit-org/syngit v0.5.2
 	gitlab.com/gitlab-org/api/client-go v1.46.0
