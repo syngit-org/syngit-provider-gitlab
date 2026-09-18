@@ -1,13 +1,13 @@
 module github.com/syngit-org/syngit-provider-gitlab
 
-go 1.25.4
+go 1.26.0
 
 require (
 	github.com/onsi/ginkgo/v2 v2.32.1
 	github.com/onsi/gomega v1.42.1
 	github.com/syngit-org/syngit v0.5.2
 	gitlab.com/gitlab-org/api/client-go v1.46.0
-	gitlab.com/gitlab-org/api/client-go/v2 v2.64.0
+	gitlab.com/gitlab-org/api/client-go/v3 v3.12.0
 	k8s.io/api v0.35.4
 	k8s.io/apimachinery v0.35.4
 	k8s.io/client-go v0.35.4
