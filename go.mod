@@ -7,7 +7,7 @@ require (
 	github.com/onsi/gomega v1.44.0
 	github.com/syngit-org/syngit v0.5.2
 	gitlab.com/gitlab-org/api/client-go v1.46.0
-	gitlab.com/gitlab-org/api/client-go/v3 v3.39.1
+	gitlab.com/gitlab-org/api/client-go/v3 v3.50.0
 	k8s.io/api v0.37.1
 	k8s.io/apimachinery v0.37.1
 	k8s.io/client-go v0.37.1
@@ -81,7 +81,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
-	go.yaml.in/yaml/v3 v3.0.5 // indirect
+	go.yaml.in/yaml/v3 v3.0.6 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/mod v0.38.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
